@@ -13,30 +13,43 @@ app.use(cors());
 app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
-// ─── Session store & auth helpers ─────────────────────────────────────────────
-const sessions = new Map();
+// ─── Session helpers (stateless HMAC-signed tokens — works with serverless) ────
 const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours
-
-function generateToken() {
-  return crypto.randomBytes(32).toString('hex');
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+if (!process.env.SESSION_SECRET && process.env.NETLIFY === 'true') {
+  console.warn('⚠️  SESSION_SECRET not set in Netlify env vars — tokens will break on cold starts. Set a static SESSION_SECRET in your Netlify dashboard.');
 }
 
 function hashPin(pin) {
   return crypto.createHash('sha256').update(String(pin)).digest('hex');
 }
 
+function encodeToken(payload) {
+  const b64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(b64).digest('base64url');
+  return `${b64}.${sig}`;
+}
+
+function decodeToken(token) {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [b64, sig] = parts;
+  const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(b64).digest('base64url');
+  if (sig !== expectedSig) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(b64, 'base64url').toString());
+    if (Date.now() > payload.expires) return null;
+    return { userId: payload.userId, role: payload.role, name: payload.name };
+  } catch { return null; }
+}
+
 function createSession(userId, role, name) {
-  const token = generateToken();
-  sessions.set(token, { userId, role, name, expires: Date.now() + SESSION_DURATION });
-  return token;
+  return encodeToken({ userId, role, name, expires: Date.now() + SESSION_DURATION });
 }
 
 function getSession(token) {
-  if (!token) return null;
-  const s = sessions.get(token);
-  if (!s) return null;
-  if (Date.now() > s.expires) { sessions.delete(token); return null; }
-  return s;
+  return decodeToken(token);
 }
 
 // ─── Google Auth ──────────────────────────────────────────────────────────────
@@ -266,9 +279,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (token) sessions.delete(token);
+  // Stateless tokens — client clears localStorage; nothing to delete server-side
   res.json({ ok: true });
 });
 

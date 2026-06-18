@@ -1,6 +1,7 @@
 node_modules/
 .env
 .env.local
+.env.netlify
 *.json.key
 *-eba40b0ad0e6.json
 research-analyst-*.json
