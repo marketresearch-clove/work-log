@@ -55,12 +55,20 @@ function getSession(token) {
 // ─── Google Auth ──────────────────────────────────────────────────────────────
 const _googleAuthOpts = (() => {
   const scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive'];
+  // PRODUCTION (Netlify/Vercel): use GOOGLE_SERVICE_ACCOUNT_JSON env var
   if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     try { return { credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON), scopes }; }
-    catch (e) { console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON:', e.message); }
+    catch (e) { console.error('❌ Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON:', e.message); }
   }
-  const keyFile = process.env.CREDENTIALS_FILE || require('path').join(__dirname, 'research-analyst-ai-eba40b0ad0e6.json');
-  return { keyFile, scopes };
+  // LOCAL DEV: use credentials file
+  const keyFile = process.env.CREDENTIALS_FILE || 'research-analyst-ai-eba40b0ad0e6.json';
+  const keyPath = path.resolve(__dirname, keyFile);
+  if (fs.existsSync(keyPath)) {
+    return { keyFile: keyPath, scopes };
+  }
+  // No credentials found — show clear error
+  console.error('❌ Google credentials not found. Set GOOGLE_SERVICE_ACCOUNT_JSON env var on Netlify (or place credentials file locally).');
+  return { scopes };
 })();
 const auth = new google.auth.GoogleAuth(_googleAuthOpts);
 
