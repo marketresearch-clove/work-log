@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.local
+*.json.key
+*-eba40b0ad0e6.json
+research-analyst-*.json
+*.log
+.claude/
+srv_out.txt
+srv_err.txt
+credential-file.json
+research-analyst-ai-eba40b0ad0e6.json

@@ -1,0 +1,22 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+  command = "echo 'No build step'"
+
+[dev]
+  command = "node server.js"
+  port = 3000
+  targetPort = 3000
+
+# Route all API requests to the serverless function
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api"
+  status = 200
+  force = true
+
+# SPA fallback — serve index.html for all non-file routes (fixes refresh/deep-link)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
